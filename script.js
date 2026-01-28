@@ -781,81 +781,68 @@ const products = [
     "updatedAt": "2026-01-28T02:55:46.000Z"
   }
 ]
-// Display products function
 function displayProducts() {
     const tbody = document.getElementById('products-body');
     
-    // Màu sắc cho từng category
+    // Màu sắc cho từng category để làm background cho ảnh placeholder
     const categoryColors = {
-        'clothes': '#FF6B9D',
-        'electronics': '#4ECDC4',
-        'shoes': '#95E1D3',
-        'miscellaneous': '#F38181'
+        'clothes': 'FF6B9D',
+        'electronics': '4ECDC4',
+        'shoes': '95E1D3',
+        'miscellaneous': 'F38181'
     };
-    
+
     products.forEach(product => {
         const row = document.createElement('tr');
-        
-        // Tạo ảnh bằng canvas với màu category
-        const canvas = document.createElement('canvas');
-        canvas.width = 80;
-        canvas.height = 80;
-        const ctx = canvas.getContext('2d');
-        
         const categorySlug = product.category.slug.toLowerCase();
-        const bgColor = categoryColors[categorySlug] || '#999';
         
-        // Vẽ background
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, 80, 80);
-        
-        // Vẽ text
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        const lines = product.title.split(' ').slice(0, 2);
-        const text = lines.join(' ').substring(0, 12);
-        ctx.fillText(text, 40, 40);
-        
+        // 1. Lấy URL ảnh từ dữ liệu (ưu tiên ảnh "thật", tránh ảnh placeholder 600x400)
+        const normalizeUrl = (u) => (typeof u === 'string' ? u.trim() : '');
+        const images = Array.isArray(product.images) ? product.images.map(normalizeUrl).filter(Boolean) : [];
+        const firstNonPlaceholder =
+            images.find(u => !u.includes('placehold.co') && !u.includes('placeholder')) || '';
+        const imageUrl = firstNonPlaceholder || images[0] || normalizeUrl(product.category?.image);
+
+        // 2. Tạo Image Cell
         const imgCell = document.createElement('td');
         const img = document.createElement('img');
-        img.src = canvas.toDataURL('image/png');
+        
         img.alt = product.title;
         img.className = 'product-img';
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '8px'; // Thêm bo góc cho đẹp
+
+        // 3. Logic xử lý Fallback sang Placehold.co
+        const color = categoryColors[categorySlug] || '999999';
+        const placeholderUrl = `https://placehold.co/80x80/${color}/ffffff?text=${encodeURIComponent(product.category.name)}`;
+
+        // Một số host ảnh chặn referrer; đặt referrerPolicy giúp ảnh load ổn định hơn
+        img.referrerPolicy = 'no-referrer';
+
+        // Thiết lập fallback 1 lần (không dựa vào so sánh string của this.src)
+        let didFallback = false;
+        img.onerror = function () {
+            if (didFallback) return;
+            didFallback = true;
+            console.warn(`Lỗi ảnh: ${product.title}. Chuyển sang placeholder.`);
+            this.src = placeholderUrl;
+        };
+
+        img.src = imageUrl || placeholderUrl;
+
         imgCell.appendChild(img);
         row.appendChild(imgCell);
-        
-        // ID
-        const idCell = document.createElement('td');
-        idCell.textContent = product.id;
-        row.appendChild(idCell);
-        
-        // Title
-        const titleCell = document.createElement('td');
-        titleCell.textContent = product.title;
-        row.appendChild(titleCell);
-        
-        // Category
-        const catCell = document.createElement('td');
-        const badge = document.createElement('span');
-        badge.className = `category-badge category-${categorySlug}`;
-        badge.textContent = product.category.name;
-        catCell.appendChild(badge);
-        row.appendChild(catCell);
-        
-        // Description
-        const descCell = document.createElement('td');
-        descCell.textContent = product.description.substring(0, 50) + '...';
-        row.appendChild(descCell);
-        
-        // Price
-        const priceCell = document.createElement('td');
-        priceCell.className = 'price-cell';
-        priceCell.textContent = '$' + product.price;
-        row.appendChild(priceCell);
-        
+
+        row.insertAdjacentHTML('beforeend', `
+            <td>${product.id}</td>
+            <td><strong>${product.title}</strong></td>
+            <td><span class="category-badge category-${categorySlug}">${product.category.name}</span></td>
+            <td>${product.description.substring(0, 50)}...</td>
+            <td class="price-cell">$${product.price}</td>
+        `);
+
         tbody.appendChild(row);
     });
 }
